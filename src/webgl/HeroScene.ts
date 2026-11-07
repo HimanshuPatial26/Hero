@@ -27,6 +27,9 @@ const CompositeShader = {
     uVideo: { value: null as THREE.Texture | null },
     uVideoMix: { value: 0 },
     uVideoXf: { value: new THREE.Vector4(1, 1, 0, 0) },
+    // grade the render to the reference: darker body, contrasty highlights
+    uVideoGain: { value: 0.78 },
+    uVideoGamma: { value: 1.2 },
     uSimTexel: { value: new THREE.Vector2(1 / 128, 1 / 128) },
     uDistortion: { value: 0.035 },
     uReveal: { value: 0 },
@@ -46,6 +49,8 @@ const CompositeShader = {
     uniform sampler2D uVideo;
     uniform float uVideoMix;
     uniform vec4 uVideoXf;
+    uniform float uVideoGain;
+    uniform float uVideoGamma;
     uniform vec2 uSimTexel;
     uniform float uDistortion;
     uniform float uReveal;
@@ -65,6 +70,7 @@ const CompositeShader = {
         vec2 vuv = suv * uVideoXf.xy + uVideoXf.zw;
         vec2 inside = step(vec2(0.0), vuv) * step(vuv, vec2(1.0));
         vec3 video = texture2D(uVideo, clamp(vuv, 0.0, 1.0)).rgb * inside.x * inside.y;
+        video = pow(video, vec3(uVideoGamma)) * uVideoGain;
         scene += video * uVideoMix;
       }
       scene *= uReveal;
