@@ -37,9 +37,9 @@ LOOP_FRAMES = FPS * LOOP_SECONDS  # 180° of rotation
 RADIUS = 1.95
 PITCH = 8.4
 LENGTH = 34.0
-TUBE = 0.3
+TUBE = 0.27
 RUNGS_PER_TURN = 10
-STRAND_POINTS = 60000  # per strand (strand B is a rotated copy)
+STRAND_POINTS = 120000  # per strand (strand B is a rotated copy)
 
 FOV_Y = 30.0  # degrees, matches the web camera
 FOCUS = 24.0
@@ -51,7 +51,7 @@ DNA_TILT_Z = -0.56
 # field is physical, so the world is scaled down to get a macro-lens amount of bokeh.
 WORLD_SCALE = 0.1
 HELIX_SCALE = 1.35  # helix size relative to the web units above
-F_STOP = 0.27
+F_STOP = 0.25
 
 THREE_TO_BLENDER = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))
 
@@ -90,48 +90,55 @@ def build_half(rng):
     pos, rad, col, emit, kind = [], [], [], [], []
     half = LENGTH / 2
 
-    deep = np.array([0.008, 0.05, 0.02])
-    mid = np.array([0.03, 0.2, 0.07])
-    cream = np.array([0.98, 0.88, 0.66])
-    gold = np.array([0.95, 0.68, 0.36])
-    neon = np.array([0.04, 1.0, 0.12])
-    mint = np.array([0.12, 1.0, 0.25])
+    # Palette (base colours; the look comes mostly from how the lights hit them)
+    shadow = np.array([0.008, 0.04, 0.025])  # near-black teal-green body
+    body = np.array([0.02, 0.12, 0.07])
+    cream = np.array([0.96, 0.88, 0.7])  # metallic cream grains catch the warm rim
+    gold = np.array([0.9, 0.62, 0.32])
+    glow = np.array([0.05, 0.75, 0.16])
+    neon = np.array([0.14, 1.0, 0.1])  # neon green; the red lifts hot cores toward white, never mint
+    rod = np.array([0.9, 0.86, 0.72])
 
-    # --- backbone: sparkly glossy grains filling a tube around the helix curve
-    for _ in range(STRAND_POINTS):
-        y = -half + rng.random() * LENGTH
+    def shell_dir(y):
         p, n, b = helix_frame(y, 0.0)
         phi = rng.random() * 2 * math.pi
-        dust = rng.random() < 0.06
-        r = TUBE * (1.05 + rng.random() * 0.6) if dust else TUBE * (0.6 + 0.4 * math.sqrt(rng.random()))
-        d = n * math.cos(phi) + b * math.sin(phi)
-        pos.append(p + d * r)
-        s = rng.random() ** 3
-        rad.append((0.009 if dust else 0.012) + s * 0.02)
+        return p, n * math.cos(phi) + b * math.sin(phi)
+
+    # --- backbone: a dense, pebbled shell of glossy grains with a crisp silhouette
+    for _ in range(STRAND_POINTS):
+        y = -half + rng.random() * LENGTH
+        p, d = shell_dir(y)
         u = rng.random()
-        if u < 0.55:
-            c = deep + (mid - deep) * rng.random()  # dark green glassy grains
+        if u < 0.012:  # a little loose dust
+            r = TUBE * (1.02 + rng.random() * 0.3)
+        elif u < 0.16:  # some depth inside the shell
+            r = TUBE * (0.45 + 0.37 * rng.random())
+        else:  # packed surface
+            r = TUBE * (0.84 + 0.16 * rng.random())
+        pos.append(p + d * r)
+        rad.append(0.009 + rng.random() ** 2.5 * 0.011)
+        v = rng.random()
+        if v < 0.78:
+            c = shadow + (body - shadow) * rng.random()
             e = 0.0
-        elif u < 0.86:
-            c = cream + (gold - cream) * rng.random() * 0.6  # warm metallic grains
+        elif v < 0.97:
+            c = cream + (gold - cream) * rng.random() * 0.5
             e = 0.0
         else:
-            c = mid + (mint - mid) * (0.3 + 0.7 * rng.random())  # faintly glowing green grains
-            e = 0.3 + rng.random() ** 2 * 1.6
+            c = glow * (0.6 + 0.4 * rng.random())
+            e = 0.35 + rng.random() * 0.9
         col.append(c)
         emit.append(e)
         kind.append(0)
 
-    # glowing studs on the backbone surface
-    for _ in range(int(LENGTH * 6)):
+    # glowing studs sitting on the backbone surface
+    for _ in range(int(LENGTH * 4)):
         y = -half + rng.random() * LENGTH
-        p, n, b = helix_frame(y, 0.0)
-        phi = rng.random() * 2 * math.pi
-        d = n * math.cos(phi) + b * math.sin(phi)
-        pos.append(p + d * TUBE * (0.9 + rng.random() * 0.2))
-        rad.append(0.02 + rng.random() ** 2 * 0.04)
+        p, d = shell_dir(y)
+        pos.append(p + d * TUBE * (0.92 + rng.random() * 0.12))
+        rad.append(0.018 + rng.random() ** 2 * 0.026)
         col.append(neon)
-        emit.append(1.8 + rng.random() * 3)
+        emit.append(2.5 + rng.random() * 2.5)
         kind.append(2)
 
     # --- rungs: A-side half only (centre is at the helix axis)
@@ -147,30 +154,36 @@ def build_half(rng):
         side = np.cross(np.array([0.0, 1.0, 0.0]), axis)
         side /= np.linalg.norm(side)
         up = np.cross(axis, side)
-        t0 = TUBE * 0.7 / L
-        for _ in range(110):
+        t0 = TUBE * 0.8 / L
+
+        # thin cream rod of fine grains
+        for _ in range(120):
             t = t0 + rng.random() * (1 - t0)
             phi = rng.random() * 2 * math.pi
-            rr = 0.04 * math.sqrt(rng.random())
+            rr = 0.028 * math.sqrt(rng.random())
             pos.append(a + axis * t * L + side * math.cos(phi) * rr + up * math.sin(phi) * rr)
-            rad.append(0.01 + rng.random() ** 3 * 0.016)
-            if rng.random() < 0.5:
-                col.append(mid + (mint - mid) * rng.random())
-                emit.append(0.5 + rng.random() * 1.2)
+            rad.append(0.009 + rng.random() ** 3 * 0.012)
+            if rng.random() < 0.85:
+                col.append(rod * (0.75 + 0.25 * rng.random()))
+                emit.append(0.22 + rng.random() * 0.45)
             else:
-                col.append(cream * (0.8 + 0.2 * rng.random()))
-                emit.append(0.15 + rng.random() * 0.5)
+                col.append(glow)
+                emit.append(0.6 + rng.random() * 0.8)
             kind.append(1)
-        # glowing beads, biased toward the strand end
-        for _ in range(2 + int(rng.random() * 3)):
+
+        # saturated neon beads, sometimes in small clusters
+        for _ in range(1 + int(rng.random() * 3)):
             t = rng.random()
-            t = t * 0.45 if rng.random() < 0.6 else t
-            t = t0 + t * (1 - t0) * 0.98
-            pos.append(a + axis * t * L + side * (rng.random() - 0.5) * 0.05 + up * (rng.random() - 0.5) * 0.05)
-            rad.append(0.03 + rng.random() ** 1.6 * 0.065)
-            col.append(neon)
-            emit.append(2.2 + rng.random() * 3.5)
-            kind.append(2)
+            t = t * 0.5 if rng.random() < 0.55 else t
+            t = t0 + t * (1 - t0) * 0.97
+            centre_b = a + axis * t * L
+            for c_i in range(1 if rng.random() < 0.7 else 2 + int(rng.random() * 2)):
+                off = axis * (c_i * (0.07 + rng.random() * 0.05))
+                pos.append(centre_b + off + side * (rng.random() - 0.5) * 0.04 + up * (rng.random() - 0.5) * 0.04)
+                rad.append(0.028 + rng.random() ** 1.7 * 0.06)
+                col.append(neon)
+                emit.append(4.0 + rng.random() * 5.0)
+                kind.append(2)
 
     return {
         "pos": np.array(pos, dtype=np.float32),
@@ -257,17 +270,17 @@ def make_material():
     rough = nt.nodes.new("ShaderNodeMapRange")
     rough.inputs["From Min"].default_value = 0
     rough.inputs["From Max"].default_value = 2
-    rough.inputs["To Min"].default_value = 0.32
-    rough.inputs["To Max"].default_value = 0.15
+    rough.inputs["To Min"].default_value = 0.2
+    rough.inputs["To Max"].default_value = 0.12
     nt.links.new(kind.outputs["Fac"], rough.inputs["Value"])
 
     nt.links.new(col.outputs["Vector"], bsdf.inputs["Base Color"])
     nt.links.new(col.outputs["Vector"], bsdf.inputs["Emission Color"])
     nt.links.new(emit.outputs["Fac"], bsdf.inputs["Emission Strength"])
     nt.links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
-    bsdf.inputs["Metallic"].default_value = 0.75
-    bsdf.inputs["Coat Weight"].default_value = 0.4
-    bsdf.inputs["Coat Roughness"].default_value = 0.08
+    bsdf.inputs["Metallic"].default_value = 0.85
+    bsdf.inputs["Coat Weight"].default_value = 0.6
+    bsdf.inputs["Coat Roughness"].default_value = 0.04
     nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
     # thousands of tiny emitters: don't treat them as lights (huge noise win)
     for holder in (mat, getattr(mat, "cycles", None)):
@@ -277,6 +290,36 @@ def make_material():
         except Exception:
             pass
     return mat
+
+
+def make_core_tubes(parent):
+    """Solid dark tube inside each grain shell: self-shadows the far side of the strand and shows
+    through the gaps between grains as dark pores, like the reference."""
+    mat = bpy.data.materials.new("dna_core")
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    bsdf.inputs["Base Color"].default_value = (0.004, 0.022, 0.012, 1)
+    bsdf.inputs["Metallic"].default_value = 0.4
+    bsdf.inputs["Roughness"].default_value = 0.42
+    half = LENGTH / 2 + 0.5
+    for strand in range(2):
+        cu = bpy.data.curves.new(f"core_{strand}", "CURVE")
+        cu.dimensions = "3D"
+        cu.bevel_depth = TUBE * 0.8
+        cu.bevel_resolution = 3
+        cu.use_fill_caps = True
+        spline = cu.splines.new("POLY")
+        n = 900
+        spline.points.add(n - 1)
+        for i in range(n):
+            y = -half + (2 * half) * i / (n - 1)
+            p, _, _ = helix_frame(y, strand * math.pi)
+            q = THREE_TO_BLENDER @ Vector(p)
+            spline.points[i].co = (q.x, q.y, q.z, 1.0)
+        obj = bpy.data.objects.new(f"core_{strand}", cu)
+        obj.data.materials.append(mat)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.parent = parent
 
 
 def add_area_light(name, loc, target, color, power, size):
@@ -318,6 +361,7 @@ def build_scene(args):
 
     dna = make_point_object("dna", geo, mat)
     dna.parent = spin
+    make_core_tubes(spin)
 
     # 180° spin over the loop (local Z == helix axis). Linear, loops seamlessly.
     spin.rotation_mode = "XYZ"
@@ -357,10 +401,23 @@ def build_scene(args):
 
     centre = C @ Vector(DNA_POS) * WORLD_SCALE
     k = WORLD_SCALE
-    # warm key from lower right / front, green rim from upper left / behind, soft top fill
-    add_area_light("key", centre + Vector((6, -12, -7)) * k, centre, (1.0, 0.84, 0.62), 3400 * k * k, 6 * k)
-    add_area_light("rim", centre + Vector((-7, 8, 6)) * k, centre, (0.2, 1.0, 0.3), 700 * k * k, 8 * k)
-    add_area_light("fill", centre + Vector((-3, -10, 9)) * k, centre, (0.55, 0.85, 0.7), 450 * k * k, 10 * k)
+    # Light rig matched to the reference (blender axes: x right, y away from camera, z up):
+    #  - strong warm rim from lower right, slightly behind: cream/gold glints on the lower-right edges
+    #  - softer warm key from upper right: beige top strand
+    #  - cool green fill from the front-left keeps the shadow side dark green, not black
+    #  - green back light for rim definition on the far side
+    add_area_light("rim_warm", centre + Vector((7.5, 3.0, -6.5)) * k, centre, (1.0, 0.8, 0.55), 7000 * k * k, 3 * k)
+    add_area_light("key_warm", centre + Vector((6.0, -5.0, 8.0)) * k, centre, (1.0, 0.86, 0.66), 1700 * k * k, 5 * k)
+    add_area_light("fill_green", centre + Vector((-6.0, -10.0, 1.0)) * k, centre, (0.35, 1.0, 0.5), 240 * k * k, 12 * k)
+    add_area_light("back_green", centre + Vector((-5.0, 9.0, 5.0)) * k, centre, (0.15, 1.0, 0.3), 900 * k * k, 8 * k)
+    # hard warm sun from the lower right: pin-point specular sparkle on every grain
+    sun_data = bpy.data.lights.new("glint_sun", "SUN")
+    sun_data.color = (1.0, 0.86, 0.64)
+    sun_data.energy = 2.2
+    sun_data.angle = math.radians(1.5)
+    sun = bpy.data.objects.new("glint_sun", sun_data)
+    scene.collection.objects.link(sun)
+    sun.rotation_euler = Vector((-0.75, 0.35, 0.55)).to_track_quat("-Z", "Y").to_euler()
 
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
@@ -425,7 +482,7 @@ def setup_compositor(scene):
         out_socket = out.inputs["Image"]
     rl = tree.nodes.new("CompositorNodeRLayers")
     glare = tree.nodes.new("CompositorNodeGlare")
-    settings = {"Type": "Bloom", "Quality": "High", "Threshold": 0.9, "Strength": 0.55, "Size": 0.62, "Saturation": 1.15}
+    settings = {"Type": "Bloom", "Quality": "High", "Threshold": 0.9, "Strength": 0.7, "Size": 0.72, "Saturation": 1.15}
     for key, value in settings.items():
         if key in glare.inputs:
             glare.inputs[key].default_value = value
