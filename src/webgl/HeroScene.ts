@@ -30,6 +30,10 @@ const CompositeShader = {
     // grade the render to the reference: darker body, contrasty highlights
     uVideoGain: { value: 0.78 },
     uVideoGamma: { value: 1.2 },
+    // soft green atmosphere around the helix (blurred average of the Blender render)
+    uHaze: { value: null as THREE.Texture | null },
+    uHazeColor: { value: new THREE.Color(0.07, 0.25, 0.11) },
+    uHazeStrength: { value: 0 },
     uSimTexel: { value: new THREE.Vector2(1 / 128, 1 / 128) },
     uDistortion: { value: 0.035 },
     uReveal: { value: 0 },
@@ -51,6 +55,9 @@ const CompositeShader = {
     uniform vec4 uVideoXf;
     uniform float uVideoGain;
     uniform float uVideoGamma;
+    uniform sampler2D uHaze;
+    uniform vec3 uHazeColor;
+    uniform float uHazeStrength;
     uniform vec2 uSimTexel;
     uniform float uDistortion;
     uniform float uReveal;
@@ -66,8 +73,12 @@ const CompositeShader = {
 
       vec3 scene = texture2D(tDiffuse, suv).rgb;
 
+      vec2 vuv = suv * uVideoXf.xy + uVideoXf.zw;
+      if (uHazeStrength > 0.001) {
+        float h = texture2D(uHaze, clamp(vuv, 0.0, 1.0)).r;
+        scene += uHazeColor * (h * h * h) * uHazeStrength;
+      }
       if (uVideoMix > 0.001) {
-        vec2 vuv = suv * uVideoXf.xy + uVideoXf.zw;
         vec2 inside = step(vec2(0.0), vuv) * step(vuv, vec2(1.0));
         vec3 video = texture2D(uVideo, clamp(vuv, 0.0, 1.0)).rgb * inside.x * inside.y;
         video = pow(video, vec3(uVideoGamma)) * uVideoGain;
@@ -129,7 +140,7 @@ export interface HeroSceneOptions {
   onReady?: () => void;
   reducedMotion?: boolean;
   /** Pre-rendered (Blender) DNA loop. Without it the procedural particle helix is used. */
-  video?: { sources: VideoSource[]; aspect: number };
+  video?: { sources: VideoSource[]; aspect: number; haze?: string };
 }
 
 function easeOutCubic(t: number) {
@@ -182,6 +193,7 @@ export class HeroScene {
 
   private video: HTMLVideoElement | null = null;
   private videoTexture: THREE.VideoTexture | null = null;
+  private hazeTexture: THREE.Texture | null = null;
   private videoAspect = 1.6;
   private videoReady = false;
   private videoFailed = false;
@@ -287,7 +299,19 @@ export class HeroScene {
     this.finalPass = new ShaderPass(FinalShader);
     this.composer.addPass(this.finalPass);
 
-    if (opts.video && opts.video.sources.length) this.setupVideo(opts.video.sources, opts.video.aspect);
+    if (opts.video && opts.video.sources.length) {
+      this.setupVideo(opts.video.sources, opts.video.aspect);
+      if (opts.video.haze) {
+        new THREE.TextureLoader().load(opts.video.haze, (tex) => {
+          if (this.disposed) return tex.dispose();
+          tex.colorSpace = THREE.NoColorSpace;
+          tex.minFilter = THREE.LinearFilter;
+          tex.generateMipmaps = false;
+          this.hazeTexture = tex;
+          this.compositePass.uniforms.uHaze.value = tex;
+        });
+      }
+    }
 
     this.resize();
 
@@ -552,6 +576,9 @@ export class HeroScene {
     this.videoMix += (videoTarget - this.videoMix) * Math.min(1, this.realDt * 2.2);
     if (Math.abs(videoTarget - this.videoMix) < 0.002) this.videoMix = videoTarget;
     this.compositePass.uniforms.uVideoMix.value = this.videoMix;
+    this.compositePass.uniforms.uHazeStrength.value = this.hazeTexture
+      ? 0.6 * (0.88 + 0.12 * Math.sin(t * 0.55)) * Math.max(this.videoMix, 0.6)
+      : 0;
     this.helixMat.uniforms.uIntensity.value = 1 - this.videoMix;
     this.helix.visible = this.videoMix < 0.999;
     this.videoTransform(1 + 0.05 * (1 - reveal));
@@ -605,6 +632,7 @@ export class HeroScene {
       this.video = null;
     }
     this.videoTexture?.dispose();
+    this.hazeTexture?.dispose();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Points) o.geometry.dispose();
     });

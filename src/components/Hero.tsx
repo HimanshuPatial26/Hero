@@ -5,7 +5,6 @@ import {
   ArrowRight,
   BarsIcon,
   BrandMark,
-  EntityGraphArt,
   LogoChain,
   LogoHex,
   LogoN,
@@ -124,7 +123,7 @@ export default function Hero() {
 
           <article className="entity-card">
             <div className="entity-card__thumb">
-              <EntityGraphArt />
+              <img src="/media/entity-graph.webp" alt="" width={108} height={110} decoding="async" />
             </div>
             <div className="entity-card__body">
               <h3 className="entity-card__title">

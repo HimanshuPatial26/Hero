@@ -45,7 +45,7 @@ export default function HeroCanvas({ eventTarget, onReady }: Props) {
     const scene = new HeroScene(el, {
       eventTarget: eventTarget.current ?? el,
       reducedMotion,
-      video: { sources: videoSources(), aspect: VIDEO_ASPECT },
+      video: { sources: videoSources(), aspect: VIDEO_ASPECT, haze: '/media/dna-haze.png' },
       onReady: () => readyRef.current(),
     });
     return () => scene.dispose();
