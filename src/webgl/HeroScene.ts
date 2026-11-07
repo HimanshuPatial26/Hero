@@ -254,7 +254,7 @@ export class HeroScene {
     this.scene.add(this.dnaRoot);
 
     // ---- Distant haze helix + dust (always real-time, layered with the video) ----
-    this.hazeMat = createParticleMaterial({ uFocus: FOCUS, uAperture: 0.0, uIntensity: 0.16, uBokehBoost: 0 });
+    this.hazeMat = createParticleMaterial({ uFocus: FOCUS, uAperture: 0.0, uIntensity: 0.22, uBokehBoost: 0 });
     const haze = new THREE.Points(buildHazeGeometry(), this.hazeMat);
     haze.frustumCulled = false;
     this.hazeSpin.add(haze);
