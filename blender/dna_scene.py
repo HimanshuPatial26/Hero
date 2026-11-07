@@ -162,13 +162,15 @@ def build_half(rng):
             phi = rng.random() * 2 * math.pi
             rr = 0.028 * math.sqrt(rng.random())
             pos.append(a + axis * t * L + side * math.cos(phi) * rr + up * math.sin(phi) * rr)
-            rad.append(0.009 + rng.random() ** 3 * 0.012)
+            rad.append(0.0075 + rng.random() ** 3 * 0.01)
+            # rods are mostly lit by the scene (cream where the warm lights hit, dark elsewhere);
+            # only a faint self-glow so the neon beads stay the brightest thing on a rung
             if rng.random() < 0.85:
-                col.append(rod * (0.75 + 0.25 * rng.random()))
-                emit.append(0.22 + rng.random() * 0.45)
+                col.append(rod * (0.4 + 0.25 * rng.random()))
+                emit.append(0.04 + rng.random() * 0.1)
             else:
                 col.append(glow)
-                emit.append(0.6 + rng.random() * 0.8)
+                emit.append(0.3 + rng.random() * 0.4)
             kind.append(1)
 
         # saturated neon beads, sometimes in small clusters
