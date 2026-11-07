@@ -12,7 +12,7 @@ const BG = new THREE.Color(7 / 255, 12 / 255, 6 / 255);
 /** How long the intro waits for the first decoded video frame before using the procedural helix. */
 const VIDEO_WAIT_MS = 1800;
 /** Where the helix sits inside the rendered video (uv), used to frame it on narrow screens. */
-const VIDEO_FOCUS = new THREE.Vector2(0.72, 0.5);
+const VIDEO_FOCUS = new THREE.Vector2(0.66, 0.5);
 
 /**
  * Fluid → scene compositor.
