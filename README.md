@@ -8,14 +8,55 @@ character → copy, CTA, logos and the floating "Entity Graph" card pop in.
 
 Built with Vite + React + TypeScript + three.js.
 
+## Run it locally
+
+You need **Node.js 18 or newer** (20/22 LTS recommended) and **Git**. Check with
+`node -v`. Nothing else is required: the Blender renders are already in `public/media`.
+
 ```bash
-npm install
-npm run dev
+git clone https://github.com/HimanshuPatial26/Hero.git
 ```
 
 ```bash
-npm run build && npm run preview
+cd Hero
 ```
+
+```bash
+git checkout claude/festive-wright-e3itr1
+```
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Open the URL Vite prints (normally http://localhost:5173) in Chrome, Edge, Firefox or
+Safari. Move the mouse over the hero to see the fluid trails warp the DNA; reload to replay
+the intro.
+
+Production build, served locally (http://localhost:4173):
+
+```bash
+npm run build
+```
+
+```bash
+npm run preview
+```
+
+The `dist/` folder is a static site, so it can be deployed to any static host as-is.
+
+**Troubleshooting**
+
+- *Port already in use*: `npm run dev -- --port 3000`.
+- *Shows the poster image, no animation*: WebGL is off. In Chrome check
+  `chrome://gpu` and enable "Use graphics acceleration when available".
+- *Particle helix instead of the photoreal one*: the video couldn't autoplay (e.g. battery
+  saver / Low Power Mode) or failed to load; the page falls back automatically.
+- *No fluid / no typing animation*: your OS has "reduce motion" turned on; the page honours it.
 
 ## How it's put together
 
@@ -34,32 +75,50 @@ back to a static poster frame.
 
 ## Re-rendering the DNA in Blender
 
-The scene is generated entirely from code, so it can be tweaked and re-rendered:
+Only needed if you change the DNA look. The scene is generated entirely from code.
+
+You need [Blender 4.2+](https://www.blender.org/download/) (or `pip install bpy`, Blender as a
+Python module), [ffmpeg](https://ffmpeg.org/download.html) for encoding, and
+`pip install numpy pillow` for the helper scripts. On Windows run the `.sh` script from Git
+Bash or WSL.
+
+With the Blender app installed (add `--gpu` to render on your graphics card: OptiX, CUDA,
+HIP, Metal or oneAPI, whichever is available; it falls back to the CPU otherwise):
 
 ```bash
-pip install bpy            # Blender as a Python module (or use `blender -b -P ... --`)
+blender -b -P blender/dna_scene.py -- --out ./render/frames --res 1440 900 --samples 80 --gpu
+```
+
+or with the `bpy` module:
+
+```bash
+python blender/dna_scene.py --out ./render/frames --res 1440 900 --samples 80 --gpu
+```
+
+Then encode the loop and rebuild the haze map:
+
+```bash
+./blender/encode.sh ./render/frames public/media
 ```
 
 ```bash
-python blender/dna_scene.py --out /tmp/dna-frames --res 1440 900 --samples 80
-```
-
-```bash
-./blender/encode.sh /tmp/dna-frames public/media
-```
-
-```bash
-python blender/haze_map.py /tmp/dna-frames public/media/dna-haze.png
+python blender/haze_map.py ./render/frames public/media/dna-haze.png
 ```
 
 The Entity Graph card thumbnail is rendered the same way:
 
 ```bash
-python blender/entity_thumb.py --out /tmp/entity.png
+blender -b -P blender/entity_thumb.py -- --out ./render/entity.png
+```
+
+```bash
+python -c "from PIL import Image; Image.open('render/entity.png').convert('RGB').resize((216,220), Image.LANCZOS).save('public/media/entity-graph.webp', quality=88)"
 ```
 
 Add `--save-blend dna.blend` to open the scene in the Blender UI, or `--frames 0 0` to render
-a single test frame. On a 4-core CPU a frame takes ~20 s at 1440×900 / 80 samples.
+a single test frame first. On a 4-core CPU a frame takes ~25 s at 1440×900 / 64–80 samples,
+so the full 192-frame loop is about 75 minutes; a recent GPU is typically many times faster.
+To resume an interrupted render, pass `--frames <first-missing> 191`.
 
 The helix is exactly symmetric under a 180° rotation about its axis, and the camera is
 fixed while the helix spins 180° over the 192 frames, so the loop has no seam. Placement,

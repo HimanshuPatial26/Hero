@@ -67,6 +67,7 @@ def parse_args():
     p.add_argument("--step", type=int, default=1)
     p.add_argument("--threads", type=int, default=0)
     p.add_argument("--save-blend", default="")
+    p.add_argument("--gpu", action="store_true", help="render on the GPU (OptiX/CUDA/HIP/Metal/oneAPI) if available")
     return p.parse_args(argv)
 
 
@@ -337,6 +338,29 @@ def add_area_light(name, loc, target, color, power, size):
     return obj
 
 
+def enable_gpu(cy):
+    """Switch Cycles to the first GPU backend that has a device; stay on CPU otherwise."""
+    try:
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+    except Exception:
+        print("GPU: cycles preferences unavailable, rendering on CPU", flush=True)
+        return
+    for backend in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
+        try:
+            prefs.compute_device_type = backend
+            prefs.get_devices()
+        except Exception:
+            continue
+        devices = [d for d in prefs.devices if d.type == backend]
+        if devices:
+            for d in prefs.devices:
+                d.use = d.type == backend
+            cy.device = "GPU"
+            print(f"GPU: rendering with {backend} on {', '.join(d.name for d in devices)}", flush=True)
+            return
+    print("GPU: no supported GPU found, rendering on CPU", flush=True)
+
+
 def build_scene(args):
     reset_scene()
     scene = bpy.context.scene
@@ -449,6 +473,8 @@ def build_scene(args):
     cy.seed = 11
     cy.use_animated_seed = False
     cy.sample_clamp_indirect = 4
+    if args.gpu:
+        enable_gpu(cy)
     if args.threads:
         scene.render.threads_mode = "FIXED"
         scene.render.threads = args.threads
