@@ -28,7 +28,7 @@ const CompositeShader = {
     uVideoMix: { value: 0 },
     uVideoXf: { value: new THREE.Vector4(1, 1, 0, 0) },
     // grade the render to the reference: darker body, contrasty highlights
-    uVideoGain: { value: 0.78 },
+    uVideoGain: { value: 0.67 },
     uVideoGamma: { value: 1.2 },
     // soft green atmosphere around the helix (blurred average of the Blender render)
     uHaze: { value: null as THREE.Texture | null },
